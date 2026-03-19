@@ -13,11 +13,10 @@ export default async function handler(req, res) {
 
     const result = {
       ccu: playerData?.response?.player_count ?? 0,
+      peak_yesterday: spyData?.ccu ?? 0,
       owners: spyData?.owners ?? '—',
-      peak_2w: spyData?.peak_2w ?? 0,
       positive: spyData?.positive ?? 0,
       negative: spyData?.negative ?? 0,
-      average_2weeks: spyData?.average_2weeks ?? 0,
     };
 
     res.setHeader('Access-Control-Allow-Origin', '*');
