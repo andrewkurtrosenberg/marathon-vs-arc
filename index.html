@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marathon vs ARC Raiders — Live Stats</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --m: #7B5CF5;
+    --m-dim: #3d2e7a;
+    --m-glow: rgba(123,92,245,0.18);
+    --a: #00C98B;
+    --a-dim: #005c40;
+    --a-glow: rgba(0,201,139,0.18);
+    --bg: #0b0c10;
+    --surface: #13141a;
+    --surface2: #1c1e27;
+    --border: rgba(255,255,255,0.07);
+    --text: #e8eaf2;
+    --muted: #6b6e80;
+    --font-display: 'Barlow Condensed', sans-serif;
+    --font-body: 'Barlow', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.08) 2px,
+      rgba(0,0,0,0.08) 4px
+    );
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  .container { max-width: 900px; margin: 0 auto; padding: 0 1.5rem; }
+
+  /* HEADER */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 2rem 0 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .header-inner {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .site-title {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 6vw, 3.5rem);
+    font-weight: 900;
+    letter-spacing: -0.01em;
+    line-height: 1;
+  }
+
+  .site-title .vs {
+    font-size: 0.5em;
+    font-weight: 600;
+    color: var(--muted);
+    margin: 0 0.3em;
+    vertical-align: middle;
+  }
+
+  .site-title .marathon { color: var(--m); }
+  .site-title .arc { color: var(--a); }
+
+  .subtitle {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 6px;
+    font-family: var(--font-display);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  .refresh-area {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+  }
+
+  .refresh-btn {
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 10px 20px;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.2);
+    color: var(--text);
+    cursor: pointer;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+  }
+
+  .refresh-btn:hover { border-color: rgba(255,255,255,0.5); background: rgba(255,255,255,0.05); }
+  .refresh-btn:active { transform: scale(0.97); }
+  .refresh-btn.loading { opacity: 0.5; pointer-events: none; }
+
+  .refresh-icon {
+    width: 14px; height: 14px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    display: inline-block;
+    animation: none;
+  }
+
+  .refresh-btn.loading .refresh-icon { animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .last-updated {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--font-display);
+    letter-spacing: 0.04em;
+  }
+
+  /* LIVE PULSE CARDS */
+  .live-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 2rem;
+  }
+
+  .live-card {
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem;
+    border: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+
+  .live-card.marathon-card { border-left: 3px solid var(--m); }
+  .live-card.arc-card { border-left: 3px solid var(--a); }
+
+  .live-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 0.5s;
+    pointer-events: none;
+  }
+
+  .marathon-card::after { background: radial-gradient(ellipse at 0% 50%, var(--m-glow), transparent 70%); }
+  .arc-card::after { background: radial-gradient(ellipse at 0% 50%, var(--a-glow), transparent 70%); }
+  .live-card:hover::after { opacity: 1; }
+
+  .live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .live-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    animation: pulse-dot 2s infinite;
+  }
+
+  .marathon-card .live-dot { background: var(--m); box-shadow: 0 0 6px var(--m); }
+  .arc-card .live-dot { background: var(--a); box-shadow: 0 0 6px var(--a); }
+  .marathon-card .live-badge { color: var(--m); }
+  .arc-card .live-badge { color: var(--a); }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+  }
+
+  .game-name {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+    margin-bottom: 3px;
+  }
+
+  .game-dev { font-size: 12px; color: var(--muted); margin-bottom: 1rem; }
+
+  .player-count {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 900;
+    line-height: 1;
+    margin-bottom: 4px;
+    transition: color 0.3s;
+  }
+
+  .marathon-card .player-count { color: var(--m); }
+  .arc-card .player-count { color: var(--a); }
+
+  .player-label { font-size: 11px; color: var(--muted); letter-spacing: 0.06em; font-family: var(--font-display); font-weight: 600; text-transform: uppercase; }
+
+  .mini-stats {
+    display: flex;
+    gap: 16px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+
+  .mini-stat { flex: 1; }
+  .mini-val { font-family: var(--font-display); font-size: 15px; font-weight: 700; color: var(--text); }
+  .mini-lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 1px; font-family: var(--font-display); font-weight: 600; }
+
+  /* ERROR STATE */
+  .api-notice {
+    background: var(--surface);
+    border: 1px solid rgba(255,180,0,0.2);
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: #f0c060;
+    margin-bottom: 1.5rem;
+    display: none;
+    font-family: var(--font-display);
+    letter-spacing: 0.03em;
+  }
+
+  /* TABS */
+  .tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 1.5rem;
+    background: var(--surface);
+    border-radius: 6px;
+    padding: 3px;
+    border: 1px solid var(--border);
+  }
+
+  .tab-btn {
+    flex: 1;
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 8px;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+
+  .tab-btn.active { background: var(--surface2); color: var(--text); }
+
+  /* SECTION */
+  .section { display: none; }
+  .section.visible { display: block; }
+
+  /* STAT TABLE */
+  .stat-table { width: 100%; border-collapse: collapse; }
+
+  .stat-table tr { border-bottom: 1px solid var(--border); }
+  .stat-table tr:last-child { border-bottom: none; }
+
+  .stat-table td {
+    padding: 11px 14px;
+    font-size: 14px;
+  }
+
+  .stat-table .col-label {
+    color: var(--muted);
+    font-size: 11px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: center;
+    width: 140px;
+  }
+
+  .stat-table .col-m { color: var(--text); text-align: right; }
+  .stat-table .col-a { color: var(--text); text-align: left; }
+
+  .win { font-weight: 500; }
+  .win-m { color: var(--m) !important; }
+  .win-a { color: var(--a) !important; }
+
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .table-header {
+    display: grid;
+    grid-template-columns: 1fr 140px 1fr;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+
+  .th-marathon { font-family: var(--font-display); font-size: 13px; font-weight: 900; color: var(--m); letter-spacing: 0.05em; text-align: right; }
+  .th-arc { font-family: var(--font-display); font-size: 13px; font-weight: 900; color: var(--a); letter-spacing: 0.05em; }
+
+  /* BAR CHART */
+  .bar-section { margin-bottom: 1rem; }
+
+  .bar-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 10px;
+  }
+
+  .bar-meta { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  .bar-name { font-family: var(--font-display); font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .bar-vals { font-family: var(--font-display); font-size: 13px; font-weight: 700; }
+  .bar-vals .mv { color: var(--m); }
+  .bar-vals .av { color: var(--a); }
+
+  .dual-bar {
+    height: 10px;
+    background: var(--surface2);
+    border-radius: 99px;
+    overflow: hidden;
+    display: flex;
+  }
+
+  .bar-m { background: var(--m); opacity: 0.85; transition: width 0.8s cubic-bezier(0.16,1,0.3,1); }
+  .bar-a { background: var(--a); opacity: 0.85; transition: width 0.8s cubic-bezier(0.16,1,0.3,1); }
+
+  /* VERDICT */
+  .verdict-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem;
+    margin-top: 1.5rem;
+    font-size: 14px;
+    color: #a0a3b5;
+    line-height: 1.7;
+  }
+
+  .verdict-box strong { color: var(--text); font-weight: 500; }
+
+  /* FOOTER */
+  footer {
+    border-top: 1px solid var(--border);
+    margin-top: 3rem;
+    padding: 1.5rem 0;
+    text-align: center;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--font-display);
+    letter-spacing: 0.06em;
+  }
+
+  /* SHIMMER for loading */
+  @keyframes shimmer {
+    0% { opacity: 0.4; }
+    50% { opacity: 0.8; }
+    100% { opacity: 0.4; }
+  }
+
+  .loading-shimmer { animation: shimmer 1.2s ease infinite; }
+
+  @media (max-width: 560px) {
+    .live-grid { grid-template-columns: 1fr; }
+    .header-inner { flex-direction: column; align-items: flex-start; }
+    .refresh-area { align-items: flex-start; }
+    .stat-table .col-label { width: 90px; font-size: 9px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="header-inner">
+      <div>
+        <h1 class="site-title">
+          <span class="marathon">Marathon</span>
+          <span class="vs">vs</span>
+          <span class="arc">ARC Raiders</span>
+        </h1>
+        <p class="subtitle">Live extraction shooter stats</p>
+      </div>
+      <div class="refresh-area">
+        <button class="refresh-btn" id="refreshBtn" onclick="fetchData()">
+          <span class="refresh-icon" id="refreshIcon"></span>
+          Refresh live data
+        </button>
+        <span class="last-updated" id="lastUpdated">Not yet loaded</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="api-notice" id="apiNotice"></div>
+
+  <!-- LIVE CARDS -->
+  <div class="live-grid">
+    <div class="live-card marathon-card">
+      <div class="live-badge"><span class="live-dot"></span> Steam live</div>
+      <div class="game-name">Marathon</div>
+      <div class="game-dev">Bungie · Mar 5, 2026 · PS5 / Xbox / PC</div>
+      <div class="player-count" id="m-ccu">—</div>
+      <div class="player-label">concurrent players</div>
+      <div class="mini-stats">
+        <div class="mini-stat">
+          <div class="mini-val" id="m-peak24">—</div>
+          <div class="mini-lbl">24h peak</div>
+        </div>
+        <div class="mini-stat">
+          <div class="mini-val" id="m-peak-all">88,337</div>
+          <div class="mini-lbl">All-time peak</div>
+        </div>
+        <div class="mini-stat">
+          <div class="mini-val" id="m-owners">—</div>
+          <div class="mini-lbl">Est. owners</div>
+        </div>
+      </div>
+    </div>
+    <div class="live-card arc-card">
+      <div class="live-badge"><span class="live-dot"></span> Steam live</div>
+      <div class="game-name">ARC Raiders</div>
+      <div class="game-dev">Embark Studios · Oct 30, 2025 · PS5 / Xbox / PC</div>
+      <div class="player-count" id="a-ccu">—</div>
+      <div class="player-label">concurrent players</div>
+      <div class="mini-stats">
+        <div class="mini-stat">
+          <div class="mini-val" id="a-peak24">—</div>
+          <div class="mini-lbl">24h peak</div>
+        </div>
+        <div class="mini-stat">
+          <div class="mini-val" id="a-peak-all">481,966</div>
+          <div class="mini-lbl">All-time peak</div>
+        </div>
+        <div class="mini-stat">
+          <div class="mini-val" id="a-owners">—</div>
+          <div class="mini-lbl">Est. owners</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('gameplay', this)">Gameplay</button>
+    <button class="tab-btn" onclick="showTab('players', this)">Player history</button>
+    <button class="tab-btn" onclick="showTab('reception', this)">Reception</button>
+  </div>
+
+  <!-- GAMEPLAY -->
+  <div class="section visible" id="tab-gameplay">
+    <div class="table-wrap">
+      <div class="table-header">
+        <div class="th-marathon">Marathon</div>
+        <div></div>
+        <div class="th-arc">ARC Raiders</div>
+      </div>
+      <table class="stat-table">
+        <tr>
+          <td class="col-m">First-person</td>
+          <td class="col-label">Perspective</td>
+          <td class="col-a win win-a">Third-person</td>
+        </tr>
+        <tr>
+          <td class="col-m win win-m">7 ability Runners</td>
+          <td class="col-label">Characters</td>
+          <td class="col-a">Gadgets & skills</td>
+        </tr>
+        <tr>
+          <td class="col-m">Low (punishing)</td>
+          <td class="col-label">Time to kill</td>
+          <td class="col-a win win-a">High (forgiving)</td>
+        </tr>
+        <tr>
+          <td class="col-m">Open PvP pools</td>
+          <td class="col-label">Matchmaking</td>
+          <td class="col-a win win-a">Aggression-based</td>
+        </tr>
+        <tr>
+          <td class="col-m">Tight, vertical</td>
+          <td class="col-label">Map style</td>
+          <td class="col-a win win-a">Open world POIs</td>
+        </tr>
+        <tr>
+          <td class="col-m">Weapon mods & implants</td>
+          <td class="col-label">Loot system</td>
+          <td class="col-a">Scrap & craft</td>
+        </tr>
+        <tr>
+          <td class="col-m">4 maps (+ Cryo Archive)</td>
+          <td class="col-label">Maps at launch</td>
+          <td class="col-a">4 maps + DLC</td>
+        </tr>
+        <tr>
+          <td class="col-m">$40 · No PS+ req.</td>
+          <td class="col-label">Price</td>
+          <td class="col-a">$40 · Standard</td>
+        </tr>
+        <tr>
+          <td class="col-m">Solo / duos / trios</td>
+          <td class="col-label">Squad size</td>
+          <td class="col-a">Solo / duos / trios</td>
+        </tr>
+        <tr>
+          <td class="col-m">Tau Ceti IV · Sci-fi</td>
+          <td class="col-label">Setting</td>
+          <td class="col-a">Post-apoc Italy</td>
+        </tr>
+        <tr>
+          <td class="col-m win win-m">Hardcore / demanding</td>
+          <td class="col-label">Accessibility</td>
+          <td class="col-a win win-a">Casual-friendly</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- PLAYERS HISTORY -->
+  <div class="section" id="tab-players">
+    <div class="bar-section">
+      <div class="bar-item">
+        <div class="bar-meta">
+          <div class="bar-name">Peak Steam CCU (all-time)</div>
+          <div class="bar-vals"><span class="mv">88k</span> &nbsp;vs&nbsp; <span class="av">481k</span></div>
+        </div>
+        <div class="dual-bar">
+          <div class="bar-m" style="width:18%"></div>
+          <div class="bar-a" style="width:82%"></div>
+        </div>
+      </div>
+      <div class="bar-item">
+        <div class="bar-meta">
+          <div class="bar-name">Peak Steam CCU at launch</div>
+          <div class="bar-vals"><span class="mv">88k</span> &nbsp;vs&nbsp; <span class="av">264k</span></div>
+        </div>
+        <div class="dual-bar">
+          <div class="bar-m" style="width:25%"></div>
+          <div class="bar-a" style="width:75%"></div>
+        </div>
+      </div>
+      <div class="bar-item">
+        <div class="bar-meta">
+          <div class="bar-name">Total copies sold (all platforms)</div>
+          <div class="bar-vals"><span class="mv">TBD</span> &nbsp;vs&nbsp; <span class="av">12M+</span></div>
+        </div>
+        <div class="dual-bar">
+          <div class="bar-m" style="width:8%"></div>
+          <div class="bar-a" style="width:92%"></div>
+        </div>
+      </div>
+      <div class="bar-item">
+        <div class="bar-meta">
+          <div class="bar-name">Cross-platform players (ARC, 2 weeks post)</div>
+          <div class="bar-vals"><span class="mv">—</span> &nbsp;vs&nbsp; <span class="av">700k+</span></div>
+        </div>
+        <div class="dual-bar">
+          <div class="bar-m" style="width:5%"></div>
+          <div class="bar-a" style="width:95%"></div>
+        </div>
+      </div>
+      <div class="bar-item">
+        <div class="bar-meta">
+          <div class="bar-name">Live Steam CCU (refreshes with button above)</div>
+          <div class="bar-vals"><span class="mv" id="bar-m-live">—</span> &nbsp;vs&nbsp; <span class="av" id="bar-a-live">—</span></div>
+        </div>
+        <div class="dual-bar" id="live-bar">
+          <div class="bar-m" id="bar-live-m" style="width:30%"></div>
+          <div class="bar-a" id="bar-live-a" style="width:70%"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RECEPTION -->
+  <div class="section" id="tab-reception">
+    <div class="table-wrap">
+      <div class="table-header">
+        <div class="th-marathon">Marathon</div>
+        <div></div>
+        <div class="th-arc">ARC Raiders</div>
+      </div>
+      <table class="stat-table">
+        <tr>
+          <td class="col-m">72 / 100</td>
+          <td class="col-label">Metacritic</td>
+          <td class="col-a win win-a">~85+</td>
+        </tr>
+        <tr>
+          <td class="col-m">65%</td>
+          <td class="col-label">Critics recommend</td>
+          <td class="col-a win win-a">92%</td>
+        </tr>
+        <tr>
+          <td class="col-m win win-m">90% Very Positive</td>
+          <td class="col-label">Steam rating</td>
+          <td class="col-a">86% Very Positive</td>
+        </tr>
+        <tr>
+          <td class="col-m">6.1 / 10</td>
+          <td class="col-label">User score</td>
+          <td class="col-a win win-a">Higher</td>
+        </tr>
+        <tr>
+          <td class="col-m">—</td>
+          <td class="col-label">Awards</td>
+          <td class="col-a win win-a">Best Multiplayer 2025</td>
+        </tr>
+        <tr>
+          <td class="col-m">Strong art, gunplay</td>
+          <td class="col-label">Praised for</td>
+          <td class="col-a">Accessibility, maps</td>
+        </tr>
+        <tr>
+          <td class="col-m">Messy UI, harsh TTK</td>
+          <td class="col-label">Criticized for</td>
+          <td class="col-a">AI voice acting</td>
+        </tr>
+        <tr>
+          <td class="col-m">Season 1 + roadmap</td>
+          <td class="col-label">Post-launch</td>
+          <td class="col-a win win-a">Patches + map DLC</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="verdict-box">
+      <strong>Bottom line:</strong> ARC Raiders wins on raw numbers — 481k peak Steam CCU, 12M+ copies sold, and a 92% critic recommendation rate. Marathon competes with a bolder visual identity, more ability-driven play, and a hardcore FPS experience that has carved out a loyal community. Both cost $40 on the same platforms. If you want an easier entry into extraction shooters, go ARC Raiders. If you want something punishing with Bungie's signature gunplay, Marathon is worth the challenge.
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="container">
+    Steam data via SteamSpy API · Updates on demand · ARC Raiders App ID: 1808500 · Marathon App ID: 3065800
+  </div>
+</footer>
+
+<script>
+  const MARATHON_ID = 3065800;
+  const ARC_ID = 1808500;
+
+  function fmt(n) {
+    if (n == null || isNaN(n)) return '—';
+    if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
+    if (n >= 1000) return (n/1000).toFixed(0) + 'k';
+    return n.toLocaleString();
+  }
+
+  async function fetchGame(appid) {
+    const res = await fetch(`https://steamspy.com/api.php?request=appdetails&appid=${appid}`);
+    if (!res.ok) throw new Error('API error');
+    return await res.json();
+  }
+
+  async function fetchData() {
+    const btn = document.getElementById('refreshBtn');
+    const icon = document.getElementById('refreshIcon');
+    const notice = document.getElementById('apiNotice');
+
+    btn.classList.add('loading');
+    notice.style.display = 'none';
+
+    try {
+      const [m, a] = await Promise.all([fetchGame(MARATHON_ID), fetchGame(ARC_ID)]);
+
+      // Marathon
+      document.getElementById('m-ccu').textContent = fmt(m.ccu);
+      document.getElementById('m-peak24').textContent = fmt(m.peak_2w) || '—';
+      document.getElementById('m-owners').textContent = m.owners || '—';
+
+      // ARC Raiders
+      document.getElementById('a-ccu').textContent = fmt(a.ccu);
+      document.getElementById('a-peak24').textContent = fmt(a.peak_2w) || '—';
+      document.getElementById('a-owners').textContent = a.owners || '—';
+
+      // Update live bar
+      const mCCU = m.ccu || 0;
+      const aCCU = a.ccu || 0;
+      const total = mCCU + aCCU || 1;
+      const mPct = Math.round((mCCU / total) * 100);
+      const aPct = 100 - mPct;
+
+      document.getElementById('bar-live-m').style.width = mPct + '%';
+      document.getElementById('bar-live-a').style.width = aPct + '%';
+      document.getElementById('bar-m-live').textContent = fmt(mCCU);
+      document.getElementById('bar-a-live').textContent = fmt(aCCU);
+
+      const now = new Date();
+      document.getElementById('lastUpdated').textContent =
+        'Updated ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    } catch (e) {
+      notice.style.display = 'block';
+      notice.textContent = 'Could not reach SteamSpy API — this is usually a CORS issue when opening the file locally. Deploy to Vercel or use a local server (e.g. npx serve .) and it will work.';
+    } finally {
+      btn.classList.remove('loading');
+    }
+  }
+
+  function showTab(id, el) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('visible'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + id).classList.add('visible');
+    el.classList.add('active');
+  }
+
+  // Auto-fetch on load
+  fetchData();
+</script>
+</body>
+</html>
