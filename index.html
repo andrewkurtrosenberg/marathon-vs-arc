@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -443,7 +444,7 @@
       <div class="mini-stats">
         <div class="mini-stat">
           <div class="mini-val" id="m-peak24">—</div>
-          <div class="mini-lbl">24h peak</div>
+          <div class="mini-lbl">Yesterday's peak</div>
         </div>
         <div class="mini-stat">
           <div class="mini-val" id="m-peak-all">88,337</div>
@@ -464,7 +465,7 @@
       <div class="mini-stats">
         <div class="mini-stat">
           <div class="mini-val" id="a-peak24">—</div>
-          <div class="mini-lbl">24h peak</div>
+          <div class="mini-lbl">Yesterday's peak</div>
         </div>
         <div class="mini-stat">
           <div class="mini-val" id="a-peak-all">481,966</div>
@@ -704,12 +705,12 @@
       // Marathon
       document.getElementById('m-ccu').textContent = fmt(m.ccu);
       document.getElementById('m-peak24').textContent = '88,337';
-      document.getElementById('m-owners').textContent = 'TBD'; || '—';
+      document.getElementById('m-owners').textContent = 'TBD';
 
       // ARC Raiders
       document.getElementById('a-ccu').textContent = fmt(a.ccu);
       document.getElementById('a-peak24').textContent = '481,966';
-      document.getElementById('a-owners').textContent = '12M+ copies'; '—';
+      document.getElementById('a-owners').textContent = '12M+ copies';
 
       // Update live bar
       const mCCU = m.ccu || 0;
