@@ -703,12 +703,12 @@
 
       // Marathon
       document.getElementById('m-ccu').textContent = fmt(m.ccu);
-      document.getElementById('m-peak24').textContent = fmt(m.peak_2w) || '—';
+      document.getElementById('m-peak24').textContent = fmt(m.peak_yesterday) || '—';
       document.getElementById('m-owners').textContent = m.owners || '—';
 
       // ARC Raiders
       document.getElementById('a-ccu').textContent = fmt(a.ccu);
-      document.getElementById('a-peak24').textContent = fmt(a.peak_2w) || '—';
+      document.getElementById('a-peak24').textContent = fmt(a.peak_yesterday) || '—';
       document.getElementById('a-owners').textContent = a.owners || '—';
 
       // Update live bar
